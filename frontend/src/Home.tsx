@@ -28,21 +28,13 @@ const Home = () => {
         </section>
 
         {/* Features Section */}
-        <section className="max-w-5xl mx-auto px-4 grid grid-cols-1 md:grid-cols-2 gap-10 mt-12">
-          <div className="bg-white p-6 rounded-lg shadow-lg text-center">
+        <section className="max-w-lg mx-auto px-4 mt-12">
+          <div className="bg-white p-6 rounded-lg shadow-lg text-center hover:shadow-xl transition">
             <h3 className="text-2xl font-semibold text-indigo-600">
               Live Prediction
             </h3>
             <p className="text-gray-600 mt-2">
               See real-time predictions as you draw digits on the canvas.
-            </p>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow-lg text-center">
-            <h3 className="text-2xl font-semibold text-indigo-600">
-              Upload Images
-            </h3>
-            <p className="text-gray-600 mt-2">
-              Upload an image of handwritten numbers for AI recognition.
             </p>
           </div>
         </section>

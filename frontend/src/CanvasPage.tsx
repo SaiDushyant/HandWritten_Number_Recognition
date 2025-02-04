@@ -1,30 +1,65 @@
 import { useEffect, useRef, useState } from "react";
-import Navbar from "./Navbar";
+import Navbar from "./NavBar";
 
 const CanvasPage = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [prediction, setPrediction] = useState("");
+  const [prediction, setPrediction] = useState(
+    "Draw a number to get prediction"
+  );
   const drawingRef = useRef(false);
   const lastXRef = useRef(0);
   const lastYRef = useRef(0);
   const timeoutRef = useRef<NodeJS.Timeout>();
 
-  const startDrawing = (e: {
-    nativeEvent: { offsetX: number; offsetY: number };
-  }) => {
+  // Initialize canvas context
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // Set initial canvas background
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }, []);
+
+  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
     drawingRef.current = true;
-    lastXRef.current = e.nativeEvent.offsetX;
-    lastYRef.current = e.nativeEvent.offsetY;
+    const rect = canvas.getBoundingClientRect();
+    const x =
+      "touches" in e
+        ? e.touches[0].clientX - rect.left
+        : (e as React.MouseEvent).nativeEvent.offsetX;
+    const y =
+      "touches" in e
+        ? e.touches[0].clientY - rect.top
+        : (e as React.MouseEvent).nativeEvent.offsetY;
+
+    lastXRef.current = x;
+    lastYRef.current = y;
   };
 
-  const draw = (e: { nativeEvent: { offsetX: number; offsetY: number } }) => {
+  const draw = (e: React.MouseEvent | React.TouchEvent) => {
     if (!drawingRef.current) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
+
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x =
+      "touches" in e
+        ? e.touches[0].clientX - rect.left
+        : (e as React.MouseEvent).nativeEvent.offsetX;
+    const y =
+      "touches" in e
+        ? e.touches[0].clientY - rect.top
+        : (e as React.MouseEvent).nativeEvent.offsetY;
 
     ctx.strokeStyle = "white";
     ctx.lineWidth = 18;
@@ -32,42 +67,78 @@ const CanvasPage = () => {
 
     ctx.beginPath();
     ctx.moveTo(lastXRef.current, lastYRef.current);
-    ctx.lineTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+    ctx.lineTo(x, y);
     ctx.stroke();
 
-    lastXRef.current = e.nativeEvent.offsetX;
-    lastYRef.current = e.nativeEvent.offsetY;
+    lastXRef.current = x;
+    lastYRef.current = y;
 
-    // Reset prediction debounce timer
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => {
       predictDigit();
-    }, 500); // Adjust debounce time as needed (500ms)
+    }, 500);
   };
 
   const stopDrawing = () => {
     drawingRef.current = false;
-    // Trigger final prediction when user stops drawing
     predictDigit();
   };
 
   const clearCanvas = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    setPrediction("");
+
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    setPrediction("Draw a number to get prediction");
+  };
+
+  const isCanvasBlank = (canvas: HTMLCanvasElement | null) => {
+    if (!canvas) return true;
+
+    // Create reference canvas with black background
+    const blank = document.createElement("canvas");
+    blank.width = canvas.width;
+    blank.height = canvas.height;
+    const ctx = blank.getContext("2d");
+
+    if (ctx) {
+      ctx.fillStyle = "black";
+      ctx.fillRect(0, 0, blank.width, blank.height);
+    }
+
+    return canvas.toDataURL() === blank.toDataURL();
   };
 
   const predictDigit = async () => {
     const canvas = canvasRef.current;
-    if (isCanvasBlank(canvas)) {
-      setPrediction("");
+    if (!canvas || isCanvasBlank(canvas)) {
+      setPrediction("Draw a number to get prediction");
       return;
     }
 
-    if (!canvas) return;
+    // Additional check for white pixels
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const hasDrawing = imageData.data.some((_, index) => {
+      // Check RGB channels for white pixels (255,255,255)
+      return (
+        imageData.data[index] === 255 &&
+        imageData.data[index + 1] === 255 &&
+        imageData.data[index + 2] === 255
+      );
+    });
+
+    if (!hasDrawing) {
+      setPrediction("Draw a number to get prediction");
+      return;
+    }
+
     canvas.toBlob(async (blob) => {
       if (blob) {
         const formData = new FormData();
@@ -85,18 +156,10 @@ const CanvasPage = () => {
           setPrediction(`Predicted Digit: ${result.predicted_class}`);
         } catch (error) {
           console.error("Error:", error);
-          setPrediction("Error predicting digit");
+          setPrediction("Error predicting digit - please try again");
         }
       }
     }, "image/png");
-  };
-
-  const isCanvasBlank = (canvas: HTMLCanvasElement | null) => {
-    const blank = document.createElement("canvas");
-    if (!canvas) return true;
-    blank.width = canvas.width;
-    blank.height = canvas.height;
-    return canvas.toDataURL() === blank.toDataURL();
   };
 
   useEffect(() => {
@@ -124,23 +187,30 @@ const CanvasPage = () => {
             onMouseMove={draw}
             onMouseUp={stopDrawing}
             onMouseOut={stopDrawing}
+            onTouchStart={startDrawing}
+            onTouchMove={draw}
+            onTouchEnd={stopDrawing}
           />
         </div>
 
         <div className="flex gap-4 mt-6">
           <button
             onClick={clearCanvas}
-            className="px-5 py-2 text-lg font-medium bg-gray-200 text-black rounded-lg transition hover:bg-gray-300"
+            className="px-5 py-2 text-lg font-medium bg-indigo-600 text-white rounded-lg transition hover:bg-indigo-700"
           >
             Clear
           </button>
         </div>
 
-        {prediction && (
-          <div className="mt-4 text-xl font-semibold text-center">
-            {prediction}
-          </div>
-        )}
+        <div
+          className={`mt-4 text-xl font-semibold text-center ${
+            prediction.startsWith("Draw") || prediction.startsWith("Error")
+              ? "text-gray-400"
+              : "text-black"
+          }`}
+        >
+          {prediction}
+        </div>
       </div>
 
       <footer className="text-center text-gray-500 text-sm py-4">
