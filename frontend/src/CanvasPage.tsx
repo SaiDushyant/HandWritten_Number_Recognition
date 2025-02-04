@@ -1,43 +1,54 @@
-import { useRef, useState } from "react";
-import Navbar from "./Navbar"; // Ensure the Navbar component is correctly imported
+import { useEffect, useRef, useState } from "react";
+import Navbar from "./Navbar";
 
 const CanvasPage = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [prediction, setPrediction] = useState("");
-
-  let drawing = false;
-  let lastX = 0;
-  let lastY = 0;
+  const drawingRef = useRef(false);
+  const lastXRef = useRef(0);
+  const lastYRef = useRef(0);
+  const timeoutRef = useRef<NodeJS.Timeout>();
 
   const startDrawing = (e: {
     nativeEvent: { offsetX: number; offsetY: number };
   }) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    drawing = true;
-    [lastX, lastY] = [e.nativeEvent.offsetX, e.nativeEvent.offsetY];
+    drawingRef.current = true;
+    lastXRef.current = e.nativeEvent.offsetX;
+    lastYRef.current = e.nativeEvent.offsetY;
   };
 
   const draw = (e: { nativeEvent: { offsetX: number; offsetY: number } }) => {
-    if (!drawing) return;
+    if (!drawingRef.current) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    ctx.strokeStyle = "white"; // Black strokes for better visibility on white background
+    ctx.strokeStyle = "white";
     ctx.lineWidth = 18;
     ctx.lineCap = "round";
 
     ctx.beginPath();
-    ctx.moveTo(lastX, lastY);
+    ctx.moveTo(lastXRef.current, lastYRef.current);
     ctx.lineTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
     ctx.stroke();
-    [lastX, lastY] = [e.nativeEvent.offsetX, e.nativeEvent.offsetY];
+
+    lastXRef.current = e.nativeEvent.offsetX;
+    lastYRef.current = e.nativeEvent.offsetY;
+
+    // Reset prediction debounce timer
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      predictDigit();
+    }, 500); // Adjust debounce time as needed (500ms)
   };
 
   const stopDrawing = () => {
-    drawing = false;
+    drawingRef.current = false;
+    // Trigger final prediction when user stops drawing
+    predictDigit();
   };
 
   const clearCanvas = () => {
@@ -52,7 +63,7 @@ const CanvasPage = () => {
   const predictDigit = async () => {
     const canvas = canvasRef.current;
     if (isCanvasBlank(canvas)) {
-      alert("Please draw a digit before predicting!");
+      setPrediction("");
       return;
     }
 
@@ -74,10 +85,8 @@ const CanvasPage = () => {
           setPrediction(`Predicted Digit: ${result.predicted_class}`);
         } catch (error) {
           console.error("Error:", error);
-          alert("Prediction failed. Please try again.");
+          setPrediction("Error predicting digit");
         }
-      } else {
-        alert("Failed to capture the drawing. Please try again.");
       }
     }, "image/png");
   };
@@ -90,18 +99,21 @@ const CanvasPage = () => {
     return canvas.toDataURL() === blank.toDataURL();
   };
 
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
   return (
     <div className="flex flex-col min-h-screen bg-white text-black">
-      {/* Navbar */}
       <Navbar />
 
-      {/* Main Content */}
       <div className="flex flex-col items-center justify-center flex-grow p-6">
         <h1 className="text-3xl font-semibold text-center mb-6">
           Digit Recognition
         </h1>
 
-        {/* Canvas Box */}
         <div className="border border-gray-300 rounded-xl shadow-lg p-4 bg-white">
           <canvas
             ref={canvasRef}
@@ -115,7 +127,6 @@ const CanvasPage = () => {
           />
         </div>
 
-        {/* Buttons */}
         <div className="flex gap-4 mt-6">
           <button
             onClick={clearCanvas}
@@ -123,15 +134,8 @@ const CanvasPage = () => {
           >
             Clear
           </button>
-          <button
-            onClick={predictDigit}
-            className="px-5 py-2 text-lg font-medium bg-black text-white rounded-lg transition hover:bg-gray-800"
-          >
-            Predict
-          </button>
         </div>
 
-        {/* Prediction Output */}
         {prediction && (
           <div className="mt-4 text-xl font-semibold text-center">
             {prediction}
@@ -139,7 +143,6 @@ const CanvasPage = () => {
         )}
       </div>
 
-      {/* Footer */}
       <footer className="text-center text-gray-500 text-sm py-4">
         Made with ❤️ | AI-powered Digit Recognition
       </footer>
