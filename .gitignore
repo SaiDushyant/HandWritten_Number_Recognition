@@ -1,0 +1,28 @@
+# Ignore Python virtual environment
+venv/
+.env
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+*.pdb
+*.sqlite3
+
+# Ignore Logs and Cache
+logs/
+*.log
+debug.log
+.DS_Store
+
+# Ignore compiled models and large files
+backend/mnist_cnn_model.h5
+backend/__pycache__/
+
+# Ignore Node.js dependencies (Frontend)
+frontend/node_modules/
+frontend/.vite/
+frontend/dist/
+
+# Ignore environment files
+frontend/.env
+backend/.env
